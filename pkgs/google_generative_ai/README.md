@@ -1,5 +1,32 @@
 # [Deprecated] Google AI Dart SDK for the Gemini API
 
+fix `langchain_google` can not set 'baseUrl' error
+
+## Step up
+```yaml
+dependency_overrides:
+  google_generative_ai:
+    git:
+      url: https://github.com/Hu-Wentao/deprecated-generative-ai-dart
+      ref: main
+      path: ./pkgs/google_generative_ai
+```
+
+## Usage 
+```dart
+ final llm = ChatGoogleGenerativeAI(
+      baseUrl: 'https://<your custom api proxy>/v1beta', // must end with '/v1beta'
+      apiKey: '<your google API Key>',
+      defaultOptions: ChatGoogleGenerativeAIOptions(
+        model: 'gemini-2.5-flash',
+      ),
+    );
+    final r = await llm.call([
+      ChatMessage.humanText('What is the capital of France?'),
+    ]);
+    print('r ${r.content}');
+```
+
 With Gemini 2.0, we took the chance to create a unified SDK for mobile
 developers who want to use Google's GenAI models (Gemini, Veo, Imagen, etc). As
 part of that process, we took all of the feedback from this SDK and what
