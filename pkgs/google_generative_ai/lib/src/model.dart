@@ -22,15 +22,22 @@ import 'content.dart';
 import 'function_calling.dart';
 
 const _apiVersion = 'v1beta';
-Uri _googleAIBaseUri(RequestOptions? options) => Uri.https(
-    'generativelanguage.googleapis.com', options?.apiVersion ?? _apiVersion);
+
+/// suit for langchain.CustomHttpClient
+Uri _googleAIBaseUri(RequestOptions? options, http.Client? httpClient) =>
+    httpClient == null
+        ? Uri.https(
+            'generativelanguage.googleapis.com',
+            options?.apiVersion ?? _apiVersion,
+          )
+        : Uri.parse('${(httpClient as dynamic).baseUrl}');
 
 enum Task {
   generateContent,
   streamGenerateContent,
   countTokens,
   embedContent,
-  batchEmbedContents;
+  batchEmbedContents,
 }
 
 /// Configuration for how a [GenerativeModel] makes requests.
@@ -43,6 +50,7 @@ final class RequestOptions {
   /// By default the version is `v1beta`.
   /// See https://ai.google.dev/gemini-api/docs/api-versions for details.
   final String? apiVersion;
+
   const RequestOptions({this.apiVersion});
 }
 
@@ -109,7 +117,7 @@ final class GenerativeModel {
         model: model,
         safetySettings: safetySettings,
         generationConfig: generationConfig,
-        baseUri: _googleAIBaseUri(requestOptions),
+        baseUri: _googleAIBaseUri(requestOptions, httpClient),
         tools: tools,
         systemInstruction: systemInstruction,
         toolConfig: toolConfig,
@@ -144,8 +152,11 @@ final class GenerativeModel {
   }
 
   Uri _taskUri(Task task) => _baseUri.replace(
-      pathSegments: _baseUri.pathSegments
-          .followedBy([_model.prefix, '${_model.name}:${task.name}']));
+        pathSegments: _baseUri.pathSegments.followedBy([
+          _model.prefix,
+          '${_model.name}:${task.name}',
+        ]),
+      );
 
   /// Generates content responding to [prompt].
   ///
@@ -170,15 +181,16 @@ final class GenerativeModel {
     ToolConfig? toolConfig,
   }) =>
       makeRequest(
-          Task.generateContent,
-          _generateContentRequest(
-            prompt,
-            safetySettings: safetySettings,
-            generationConfig: generationConfig,
-            tools: tools,
-            toolConfig: toolConfig,
-          ),
-          parseGenerateContentResponse);
+        Task.generateContent,
+        _generateContentRequest(
+          prompt,
+          safetySettings: safetySettings,
+          generationConfig: generationConfig,
+          tools: tools,
+          toolConfig: toolConfig,
+        ),
+        parseGenerateContentResponse,
+      );
 
   /// Generates a stream of content responding to [prompt].
   ///
@@ -205,14 +217,15 @@ final class GenerativeModel {
     ToolConfig? toolConfig,
   }) {
     final response = _client.streamRequest(
-        _taskUri(Task.streamGenerateContent),
-        _generateContentRequest(
-          prompt,
-          safetySettings: safetySettings,
-          generationConfig: generationConfig,
-          tools: tools,
-          toolConfig: toolConfig,
-        ));
+      _taskUri(Task.streamGenerateContent),
+      _generateContentRequest(
+        prompt,
+        safetySettings: safetySettings,
+        generationConfig: generationConfig,
+        tools: tools,
+        toolConfig: toolConfig,
+      ),
+    );
     return response.map(parseGenerateContentResponse);
   }
 
@@ -254,7 +267,7 @@ final class GenerativeModel {
               generationConfig: generationConfig,
               tools: tools,
               toolConfig: toolConfig,
-            )
+            ),
           },
           parseCountTokensResponse);
 
@@ -306,9 +319,11 @@ final class GenerativeModel {
           Task.batchEmbedContents,
           {
             'requests': requests
-                .map((r) =>
-                    r.toJson(defaultModel: '${_model.prefix}/${_model.name}'))
-                .toList()
+                .map(
+                  (r) =>
+                      r.toJson(defaultModel: '${_model.prefix}/${_model.name}'),
+                )
+                .toList(),
           },
           parseBatchEmbedContentsResponse);
 
@@ -340,8 +355,11 @@ final class GenerativeModel {
 
 extension VertexExtensions on GenerativeModel {
   /// Make a unary request for [task] with JSON encodable [params].
-  Future<T> makeRequest<T>(Task task, Map<String, Object?> params,
-          T Function(Map<String, Object?>) parse) =>
+  Future<T> makeRequest<T>(
+    Task task,
+    Map<String, Object?> params,
+    T Function(Map<String, Object?>) parse,
+  ) =>
       _client.makeRequest(_taskUri(task), params).then(parse);
 }
 
@@ -363,7 +381,7 @@ GenerativeModel createModelWithClient({
       model: model,
       safetySettings: safetySettings,
       generationConfig: generationConfig,
-      baseUri: _googleAIBaseUri(requestOptions),
+      baseUri: _googleAIBaseUri(requestOptions, null),
       systemInstruction: systemInstruction,
       tools: tools,
       toolConfig: toolConfig,
